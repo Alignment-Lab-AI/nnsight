@@ -24,7 +24,7 @@ class Envoy:
         _tracer (nnsight.context.Tracer.Tracer): Object which adds this Envoy's module's output and input proxies to an intervention graph. Must be set on Envoys objects manually by the Tracer.
     """
 
-    def __init__(self, module: torch.nn.Module, module_path: str = ""):
+    def __init__(self, module: torch.nn.Module, module_path: str = "", attr_map: dict = {}):
 
         self._module_path = module_path
 
@@ -39,6 +39,7 @@ class Envoy:
         self._tracer: Tracer = None
 
         self._module = module
+        self._attr_map = attr_map
         self._sub_envoys: List[Envoy] = []
 
         # Register hook on underlying module to update the _fake_outputs and _fake_inputs on forward pass.
@@ -69,7 +70,7 @@ class Envoy:
 
     def _add_envoy(self, module: torch.nn.Module, name: str):
 
-        envoy = Envoy(module, module_path=f"{self._module_path}.{name}")
+        envoy = Envoy(module, module_path=f"{self._module_path}.{name}", attr_map=self._attr_map)
 
         self._sub_envoys.append(envoy)
 
@@ -78,6 +79,10 @@ class Envoy:
         if hasattr(Envoy, name):
 
             self._handle_overloaded_mount(envoy, name)
+
+        elif name in self._attr_map:
+            
+            setattr(self, self._attr_map[name], envoy)
 
         else:
 
@@ -386,7 +391,12 @@ class Envoy:
 
         torch.set_default_device(device)
 
-        proxy = module_proxy.forward(*args, **kwargs)
+        traceable = kwargs.pop('traceable', False)
+
+        if traceable:
+            proxy = module_proxy(*args, **kwargs)
+        else:
+            proxy = module_proxy.forward(*args, **kwargs)
 
         torch._GLOBAL_DEVICE_CONTEXT.__exit__(None, None, None)
 
