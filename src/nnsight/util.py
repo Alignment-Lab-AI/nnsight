@@ -106,16 +106,6 @@ def meta_deepcopy(self: torch.nn.parameter.Parameter, memo):
         return result
 
 
-def fetch_sub_envoy(envoy, target):
-    if envoy._module_path == target:
-        return envoy
-    
-    for sub in envoy._sub_envoys:
-        result = fetch_sub_envoy(sub, target)  
-        if result is not None:
-            return result
-
-
 class WrapperModule(torch.nn.Module):
     """Simple torch module which passes it's input through. Useful for hooking.
     If there is only one argument, returns the first element.
